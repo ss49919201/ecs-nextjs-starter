@@ -1,10 +1,43 @@
-```sh
-cd infra && \
-terraform apply
+## 話すこと
 
-cd frontend && \
-aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin 504784160859.dkr.ecr.ap-northeast-1.amazonaws.com && \
-docker build --platform linux/x86-64 . -t frontend && \
-docker tag frontend:latest 504784160859.dkr.ecr.ap-northeast-1.amazonaws.com/frontend:latest && \
-docker push 504784160859.dkr.ecr.ap-northeast-1.amazonaws.com/frontend:latest
-```
+TerraformでIaC化した環境に、Next.jsプロジェクトをデプロイしての振り返り。
+
+## 始めに
+
+これまではバックエンドをGoで書いたり、IaCをCloudFormationやCDKで書いたりしてきた。
+今後業務で使うかどうかは置いておき、社内の未使用技術に触れてみたいと思い、Next.jsで作ったアプリケーションをTerraformで構築したECS上にデプロイしてみた。
+
+## Next.js
+
+- チュートリアルに沿って、プロジェクトをセットアップした。
+- バックエンドと疎通するアプリケーションを開発する予定だったが、簡素なウェルカムページまでしか作れなかった。
+- `next start`でサーバーが起動するDockerfileを書いて、こちらを使ってビルドしたイメージをデプロイすることにした。
+- デプロイはShellコマンドを作った。イメージをビルドしてプッシュした後にECS Serviceを強制アップデートするといったもの。
+
+## Terraform
+
+- VPC + Subnet + VPC Endpoint + ELB + ECS + ECR の構成を書いた。
+- CloudFormationと比べてかなり直感的で書きやすいと感じた。CDKに比べると抽象度は低くプログラミングっぽくないが、個人的にはちょうど良いと感じた。CDKの抽象度の高さや自由度の高さで苦労した経験があった為。
+	- 具体的には繰り返しの部分の書き味
+	- JSONの書き方
+- `terraform scan`便利すぎる
+- `terraform plan`の差分が綺麗すぎる
+- 当然CFnに変換されているのだろうと勘違いしてい多ので、状態管理ファイルが別で存在していることに驚いた
+- デプロイが早い
+	- CFn経由していないので、内部でSDK呼んでいるっぽい
+- Rollbackがない
+	- 心配
+
+## インフラの話
+
+- ECSから外向きに通信が走るタイミングがタスク起動時(ECRからイメージを引っ張る時)くらいしかないので、Nat Gateway無駄すぎじゃない？と思って、VPC Endpointを使った。
+	- プライベートサブネットからVPC外のサービスにアクセスできる
+	- Nat Gatewayより安い
+	- インターネットに出ないのでセキュアと言われた時代もあった
+		- https://future-architect.github.io/articles/20210618a/
+
+## 終わりに
+
+
+Terraformの良さを感じられて良かった。書き味もかなり自分好みだったので、moduleとかの便利機能も学んでガンガン使えるようになりたい。
+Next.jsはフロントエンドをやったと言えるようなものは作れなかった。だが逆にほとんど何もしていないのにDockerfile書いただけで、すぐにECS上で動いたので(サーバーに関する処理は全くコード書いていない)、フロントエンド側の実装に集中できそうなフレームワークなのかなあと感じた。
