@@ -5,7 +5,7 @@ import axios from "axios";
 import type {NextPage} from 'next'
 
 const Home: NextPage = () => {
-  let [name, setName] = useState("Dummy")
+  const [name, setName] = useState("Dummy")
   const asyncFn = async () => {
     await axios.get("http://127.0.0.1:80/name").then(res => {
       setName(res.data);
