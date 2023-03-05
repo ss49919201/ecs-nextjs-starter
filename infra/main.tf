@@ -69,23 +69,41 @@ resource "aws_vpc_endpoint_route_table_association" "private_s3" {
 }
 
 // Subnet
-variable "availability_zones" {
-  type    = list(string)
-  default = ["ap-northeast-1a", "ap-northeast-1c"]
+locals {
+  subnet_public_param_map = {
+    az1a = {
+      availability_zone = "ap-northeast-1a"
+      cidr_block        = "10.0.1.0/24"
+    }
+    az1c = {
+      availability_zone = "ap-northeast-1c"
+      cidr_block        = "10.0.2.0/24"
+    }
+  }
+  subnet_private_param_map = {
+    az1a = {
+      availability_zone = "ap-northeast-1a"
+      cidr_block        = "10.0.3.0/24"
+    }
+    az1c = {
+      availability_zone = "ap-northeast-1c"
+      cidr_block        = "10.0.4.0/24"
+    }
+  }
 }
 
 resource "aws_subnet" "public" {
-  count             = 2
+  for_each          = local.subnet_public_param_map
   vpc_id            = aws_vpc.app.id
-  cidr_block        = "10.0.${count.index + 1}.0/24"
-  availability_zone = var.availability_zones[count.index]
+  cidr_block        = each.value.cidr_block
+  availability_zone = each.value.availability_zone
 }
 
 resource "aws_subnet" "private" {
-  count             = 2
+  for_each          = local.subnet_private_param_map
   vpc_id            = aws_vpc.app.id
-  cidr_block        = "10.0.${count.index + 3}.0/24"
-  availability_zone = var.availability_zones[count.index]
+  cidr_block        = each.value.cidr_block
+  availability_zone = each.value.availability_zone
 }
 
 resource "aws_internet_gateway" "app" {
@@ -93,7 +111,6 @@ resource "aws_internet_gateway" "app" {
 }
 
 resource "aws_route_table" "public" {
-  count  = length(aws_subnet.private)
   vpc_id = aws_vpc.app.id
   route {
     cidr_block = "0.0.0.0/0"
@@ -102,9 +119,9 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table_association" "public" {
-  count          = length(aws_subnet.public)
-  subnet_id      = aws_subnet.public[count.index].id
-  route_table_id = aws_route_table.public[count.index].id
+  for_each       = aws_subnet.public
+  subnet_id      = each.value.id
+  route_table_id = aws_route_table.public.id
 }
 
 resource "aws_route_table" "private" {
@@ -112,8 +129,8 @@ resource "aws_route_table" "private" {
 }
 
 resource "aws_route_table_association" "app_private" {
-  count          = length(aws_subnet.private)
-  subnet_id      = aws_subnet.private[count.index].id
+  for_each       = aws_subnet.private
+  subnet_id      = each.value.id
   route_table_id = aws_route_table.private.id
 }
 
